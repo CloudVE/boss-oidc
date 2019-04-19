@@ -48,6 +48,10 @@ if LOAD_USER_ROLES is None:
 else: # pragma: no cover
     LOAD_USER_ROLES_FUNCTION = import_from_string(LOAD_USER_ROLES, 'LOAD_USER_ROLES')
 
+# If a user with the same name already exists, do not delete and replace with
+# the keycloak user - simply update their details
+PRESERVE_EXISTING_USER = getattr(settings, 'BOSSOIDC_PRESERVE_EXISTING_USER', False)
+
 
 def update_user_data(user, userinfo):
     """Default implementation of the UPDATE_USER_DATA callback
@@ -141,14 +145,15 @@ def get_user_by_id(request, userinfo):
         try:
             user = UserModel.objects.get_by_natural_key(username)
 
-            fmt = "Deleting user '{}' becuase it matches the authenticated Keycloak username"
+            fmt = "Deleting user '{}' because it matches the authenticated Keycloak username"
             _log('get_user_by_id').info(fmt.format(username))
 
             # remove existing user account, so permissions are not transfered
             # DP NOTE: required, as the username field is still a unique field,
             #          which doesn't allow multiple users in the table with the
             #          same username
-            user.delete()
+            if not PRESERVE_EXISTING_USER:
+                user.delete()
         except UserModel.DoesNotExist:
             pass
 
